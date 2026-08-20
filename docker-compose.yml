@@ -1,0 +1,89 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: agentic
+      POSTGRES_USER: agentic
+      POSTGRES_PASSWORD: agentic
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentic -d agentic"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes: ["./docker/otel-collector-config.yaml:/etc/otelcol/config.yaml"]
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
+  app:
+    build: .
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/agentic
+      DB_USER: agentic
+      DB_PASSWORD: agentic
+      DEMO_SEED_DATA: ${DEMO_SEED_DATA:-true}
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://otel-collector:4318/v1/metrics
+      LLM_DEFAULT_PROVIDER: ${LLM_DEFAULT_PROVIDER:-LMSTUDIO}
+      LMSTUDIO_ENABLED: ${LMSTUDIO_ENABLED:-true}
+      LMSTUDIO_BASE_URL: ${LMSTUDIO_BASE_URL:-http://192.168.64.1:1234/v1}
+      LMSTUDIO_DEFAULT_MODEL: ${LMSTUDIO_DEFAULT_MODEL:-openai/gpt-oss-20b}
+      LMSTUDIO_API_KEY: ${LMSTUDIO_API_KEY:-lm-studio}
+      ANTHROPIC_ENABLED: ${ANTHROPIC_ENABLED:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_ENABLED: ${OPENAI_ENABLED:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      BEDROCK_ENABLED: ${BEDROCK_ENABLED:-false}
+      AWS_REGION: ${AWS_REGION:-eu-central-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      OLLAMA_ENABLED: ${OLLAMA_ENABLED:-false}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      JIRA_ENABLED: ${JIRA_ENABLED:-false}
+      JIRA_BASE_URL: ${JIRA_BASE_URL:-}
+      JIRA_EMAIL: ${JIRA_EMAIL:-}
+      JIRA_API_TOKEN: ${JIRA_API_TOKEN:-}
+      CODING_MAX_TOKENS: ${CODING_MAX_TOKENS:-200000}
+      CODING_MAX_ITERATIONS: ${CODING_MAX_ITERATIONS:-20}
+      CODING_MAX_DURATION: ${CODING_MAX_DURATION:-15m}
+      CODING_CONTAINER_IMAGE: ${CODING_CONTAINER_IMAGE:-eclipse-temurin:21-jdk}
+      CODING_CONTAINER_MEMORY: ${CODING_CONTAINER_MEMORY:-2g}
+      CODING_CONTAINER_CPU: ${CODING_CONTAINER_CPU:-2.0}
+      CODING_DEFAULT_REPO_URL: ${CODING_DEFAULT_REPO_URL:-}
+      CODING_DEFAULT_BASE_REF: ${CODING_DEFAULT_BASE_REF:-main}
+      CODING_TEST_COMMAND: ${CODING_TEST_COMMAND:-./mvnw -q test}
+      GITHUB_ENABLED: ${GITHUB_ENABLED:-false}
+      GITHUB_AUTH_MODE: ${GITHUB_AUTH_MODE:-pat}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_INSTALLATION_ID: ${GITHUB_APP_INSTALLATION_ID:-}
+      GITHUB_APP_PRIVATE_KEY_PEM: ${GITHUB_APP_PRIVATE_KEY_PEM:-}
+      GITHUB_BRANCH_PREFIX: ${GITHUB_BRANCH_PREFIX:-agentic/}
+      GITHUB_COMMIT_AUTHOR_NAME: ${GITHUB_COMMIT_AUTHOR_NAME:-Agentic SDLC}
+      GITHUB_COMMIT_AUTHOR_EMAIL: ${GITHUB_COMMIT_AUTHOR_EMAIL:-agentic-sdlc@agenticdev.com}
+      DOCKER_HOST: ${DOCKER_HOST:-unix:///var/run/docker.sock}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports: ["8088:8080"]
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - app
+    ports: ["3000:3000"]
+
+volumes:
+  pgdata:

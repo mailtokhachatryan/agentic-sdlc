@@ -1,0 +1,156 @@
+spring:
+  application:
+    name: agentic-sdlc
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/agentic}
+    username: ${DB_USER:}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+
+app:
+  demo:
+    seed-data: ${DEMO_SEED_DATA:false}
+  llm:
+    request-timeout: ${LLM_REQUEST_TIMEOUT:10m}
+    default-provider: ${LLM_DEFAULT_PROVIDER:LMSTUDIO}
+    openai:
+      enabled: ${OPENAI_ENABLED:false}
+      api-key: ${OPENAI_API_KEY:}
+      default-model: ${OPENAI_DEFAULT_MODEL:gpt-4o}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+    anthropic:
+      enabled: ${ANTHROPIC_ENABLED:false}
+      api-key: ${ANTHROPIC_API_KEY:}
+      default-model: ${ANTHROPIC_DEFAULT_MODEL:claude-sonnet-4-6}
+    bedrock:
+      enabled: ${BEDROCK_ENABLED:false}
+      region: ${AWS_REGION:eu-central-1}
+      default-model: ${BEDROCK_DEFAULT_MODEL:anthropic.claude-sonnet-4-v1:0}
+    ollama:
+      enabled: ${OLLAMA_ENABLED:false}
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      default-model: ${OLLAMA_DEFAULT_MODEL:llama3.1}
+    lmstudio:
+      enabled: ${LMSTUDIO_ENABLED:false}
+      api-key: ${LMSTUDIO_API_KEY:lm-studio}
+      base-url: ${LMSTUDIO_BASE_URL:http://localhost:1234/v1}
+      default-model: ${LMSTUDIO_DEFAULT_MODEL:openai/gpt-oss-20b}
+  jira:
+    enabled: ${JIRA_ENABLED:false}
+    base-url: ${JIRA_BASE_URL:}
+    email: ${JIRA_EMAIL:}
+    api-token: ${JIRA_API_TOKEN:}
+    connect-timeout: 2s
+    read-timeout: 5s
+  planning:
+    agent:
+      system-prompt: |
+        You are a senior software engineer producing implementation plans for engineering tasks.
+        You receive a single task description (free text or a Jira ticket snapshot).
+        You MUST output a plan with: summary, approach, tasks, filesToTouch, risks, openQuestions, markdown.
+        Rules:
+         - Be concrete. Reference specific files when you can infer them; otherwise describe by role.
+         - Prefer the smallest change that satisfies the task.
+         - Flag anything ambiguous in openQuestions instead of inventing requirements.
+         - Keep 'markdown' as a human-readable mirror of the structured fields.
+      user-prompt-template: |
+        Task:
+        {{task}}
+  coding:
+    budget:
+      max-tokens: ${CODING_MAX_TOKENS:200000}
+      max-iterations: ${CODING_MAX_ITERATIONS:20}
+      max-duration: ${CODING_MAX_DURATION:15m}
+    container:
+      image: ${CODING_CONTAINER_IMAGE:eclipse-temurin:21-jdk}
+      memory: ${CODING_CONTAINER_MEMORY:2g}
+      cpu: ${CODING_CONTAINER_CPU:2.0}
+      network-disabled: true
+    default-repo-url: ${CODING_DEFAULT_REPO_URL:}
+    default-base-ref: ${CODING_DEFAULT_BASE_REF:main}
+    agent:
+      test-command: ${CODING_TEST_COMMAND:./mvnw -q test}
+      system-prompt: |
+        You are an autonomous coding agent implementing a software engineering plan.
+        You receive a structured plan and have tools to interact with a sandboxed
+        repository workspace: readFile, writeFile, listFiles, runCommand.
+        Rules:
+         - Work through the plan's tasks in order.
+         - Prefer the smallest change that satisfies each task.
+         - After making changes, run the build/test command to verify correctness.
+         - If tests fail, read the error output and fix the issues before moving on.
+         - When all tests pass, stop and report a brief summary.
+         - Do NOT make changes outside the plan's scope.
+         - Never modify .git, CI config, or secret files.
+    webhook:
+      connect-timeout: ${CODING_WEBHOOK_CONNECT_TIMEOUT:2s}
+      read-timeout: ${CODING_WEBHOOK_READ_TIMEOUT:5s}
+  github:
+    enabled: ${GITHUB_ENABLED:false}
+    auth-mode: ${GITHUB_AUTH_MODE:pat}
+    pat:
+      token: ${GITHUB_TOKEN:}
+    app:
+      app-id: ${GITHUB_APP_ID:}
+      installation-id: ${GITHUB_APP_INSTALLATION_ID:}
+      private-key-pem: ${GITHUB_APP_PRIVATE_KEY_PEM:}
+    branch-prefix: ${GITHUB_BRANCH_PREFIX:agentic/}
+    default-labels:
+      - agentic-sdlc
+    commit:
+      author-name: ${GITHUB_COMMIT_AUTHOR_NAME:Agentic SDLC}
+      author-email: ${GITHUB_COMMIT_AUTHOR_EMAIL:agentic-sdlc@agenticdev24.com}
+      message-template: |
+        feat: {{summary}}
+
+        Implements plan {{planId}}
+        Coding run: {{codingRunId}}
+
+        Signed-off-by: {{authorName}} <{{authorEmail}}>
+    retry:
+      max-attempts: ${GITHUB_RETRY_MAX_ATTEMPTS:3}
+      initial-backoff: ${GITHUB_RETRY_INITIAL_BACKOFF:500ms}
+      max-backoff: ${GITHUB_RETRY_MAX_BACKOFF:5s}
+      multiplier: ${GITHUB_RETRY_MULTIPLIER:2.0}
+    pr-body-template: |
+      ## Summary
+      {{summary}}
+
+      ## Plan
+      {{planMarkdown}}
+
+      ## Details
+      - Plan ID: `{{planId}}`
+      - Coding run: `{{codingRunId}}`
+      - Files changed: {{filesChanged}}
+      - Tests passed: {{testsPassed}}
+
+      _Generated by Agentic SDLC_
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://otel-collector:4318/v1/traces}
+    metrics:
+      export:
+        url: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:http://otel-collector:4318/v1/metrics}
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name},%X{traceId:-},%X{spanId:-}]"

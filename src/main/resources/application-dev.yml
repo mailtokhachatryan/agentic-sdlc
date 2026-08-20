@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/agentic
+    username: agentic
+    password: agentic
+  jpa:
+    show-sql: true
+
+app:
+  llm:
+    default-provider: LMSTUDIO
+    lmstudio:
+      enabled: true
+
+logging:
+  level:
+    com.agenticdev.sdlc: DEBUG
+    dev.langchain4j: INFO
