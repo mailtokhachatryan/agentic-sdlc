@@ -174,7 +174,7 @@ Each slice owns its full stack. New features sit alongside existing ones without
 ## Quick Start
 
 ```bash
-git clone https://github.com/<you>/agentic-sdlc.git
+git clone https://github.com/mailtokhachatryan/agentic-sdlc.git
 cd agentic-sdlc
 
 cp .env.example .env
